@@ -1,5 +1,6 @@
 // API 基础配置
-const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_BASE_URL || 'http://localhost:9091';
+// Vercel 同域部署时该变量为空，使用相对路径 /api/v1/...；Coze 沙箱下由系统注入
+const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_BASE_URL || '';
 
 // 通用请求函数
 async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
