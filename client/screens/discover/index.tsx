@@ -8,6 +8,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   Dimensions,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -53,6 +54,39 @@ export default function DiscoverScreen() {
   // 获取位置
   const requestLocation = useCallback(async () => {
     setLocationStatus('loading');
+    
+    // Web平台使用浏览器Geolocation API
+    if (Platform.OS === 'web') {
+      if (typeof navigator !== 'undefined' && navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            setLocation({
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+            });
+            setLocationStatus('success');
+          },
+          (error) => {
+            console.error('Web定位失败:', error.message);
+            // 使用默认位置（北京）
+            setLocation({ latitude: 39.9042, longitude: 116.4074 });
+            setLocationStatus('fallback');
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0,
+          }
+        );
+      } else {
+        // 浏览器不支持定位
+        setLocation({ latitude: 39.9042, longitude: 116.4074 });
+        setLocationStatus('fallback');
+      }
+      return;
+    }
+
+    // 原生平台使用expo-location
     try {
       // 先检查权限
       const { status } = await Location.getForegroundPermissionsAsync();
