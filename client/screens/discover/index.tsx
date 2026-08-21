@@ -47,26 +47,56 @@ export default function DiscoverScreen() {
   const [loading, setLoading] = useState(true);
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [selectedDistance, setSelectedDistance] = useState(5);
+  const [locationStatus, setLocationStatus] = useState<'loading' | 'success' | 'fallback' | 'error'>('loading');
+  const [refreshing, setRefreshing] = useState(false);
 
   // 获取位置
   const requestLocation = useCallback(async () => {
+    setLocationStatus('loading');
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
+      // 先检查权限
+      const { status } = await Location.getForegroundPermissionsAsync();
+      
       if (status !== 'granted') {
-        console.log('位置权限被拒绝');
-        // 使用默认位置（北京）
-        setLocation({ latitude: 39.9042, longitude: 116.4074 });
-        return;
+        // 请求权限
+        const requestResult = await Location.requestForegroundPermissionsAsync();
+        if (requestResult.status !== 'granted') {
+          console.log('位置权限被拒绝');
+          // 使用默认位置（北京）
+          setLocation({ latitude: 39.9042, longitude: 116.4074 });
+          setLocationStatus('fallback');
+          return;
+        }
       }
 
-      const locationData = await Location.getCurrentPositionAsync({});
+      // 获取位置，使用高精度
+      const locationData = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
       setLocation({
         latitude: locationData.coords.latitude,
         longitude: locationData.coords.longitude,
       });
+      setLocationStatus('success');
     } catch (err) {
       console.error('获取位置失败:', err);
+      // 尝试使用最后已知位置
+      try {
+        const lastLocation = await Location.getLastKnownPositionAsync();
+        if (lastLocation) {
+          setLocation({
+            latitude: lastLocation.coords.latitude,
+            longitude: lastLocation.coords.longitude,
+          });
+          setLocationStatus('success');
+          return;
+        }
+      } catch (e) {
+        console.error('获取最后位置也失败:', e);
+      }
+      // 使用默认位置（北京）
       setLocation({ latitude: 39.9042, longitude: 116.4074 });
+      setLocationStatus('fallback');
     }
   }, []);
 
@@ -213,16 +243,51 @@ export default function DiscoverScreen() {
         <ScrollView showsVerticalScrollIndicator={false}>
           {/* Header */}
           <View style={styles.header}>
-            <View>
+            <View style={styles.headerLeft}>
               <Text style={styles.headerTitle}>附近发现</Text>
-              <Text style={styles.headerSubtitle}>
-                {location ? '已定位到当前位置' : '正在获取位置...'}
-              </Text>
+              <View style={styles.locationStatusRow}>
+                {locationStatus === 'loading' && (
+                  <>
+                    <ActivityIndicator size="small" color="#FF7A59" />
+                    <Text style={styles.locationStatusText}>正在获取位置...</Text>
+                  </>
+                )}
+                {locationStatus === 'success' && (
+                  <>
+                    <View style={styles.locationDot} />
+                    <Text style={styles.locationStatusText}>已定位到当前位置</Text>
+                  </>
+                )}
+                {locationStatus === 'fallback' && (
+                  <>
+                    <View style={[styles.locationDot, { backgroundColor: '#FDCB6E' }]} />
+                    <Text style={styles.locationStatusText}>使用默认位置（北京）</Text>
+                  </>
+                )}
+              </View>
             </View>
-            <TouchableOpacity style={styles.locationButton} onPress={requestLocation}>
-              <Feather name="crosshair" size={20} color="#FF7A59" />
+            <TouchableOpacity 
+              style={styles.locationButton} 
+              onPress={requestLocation}
+              disabled={refreshing}
+            >
+              <Feather 
+                name="crosshair" 
+                size={20} 
+                color={refreshing ? '#B2BEC3' : '#FF7A59'} 
+              />
             </TouchableOpacity>
           </View>
+
+          {/* 定位提示 */}
+          {locationStatus === 'fallback' && (
+            <View style={styles.locationTip}>
+              <Feather name="alert-circle" size={14} color="#FDCB6E" />
+              <Text style={styles.locationTipText}>
+                定位权限未开启，显示的是默认位置。点击右侧按钮可重新定位。
+              </Text>
+            </View>
+          )}
 
           {/* 距离筛选 */}
           {renderDistanceFilter()}
@@ -271,6 +336,37 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#636E72',
     marginTop: 4,
+  },
+  headerLeft: {
+    flex: 1,
+  },
+  locationStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  locationDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#00B894',
+    marginRight: 6,
+  },
+  locationStatusText: {
+    fontSize: 13,
+    color: '#636E72',
+  },
+  locationTip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingBottom: 12,
+  },
+  locationTipText: {
+    fontSize: 12,
+    color: '#636E72',
+    marginLeft: 6,
+    flex: 1,
   },
   locationButton: {
     width: 40,
