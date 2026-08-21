@@ -16,6 +16,7 @@ import * as Location from 'expo-location';
 import { placesApi, type Place } from '@/utils/api';
 import { Screen } from '@/components/Screen';
 import { useSafeRouter } from '@/hooks/useSafeRouter';
+import { getCurrentPositionWithAMap } from '@/utils/amap';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -55,8 +56,17 @@ export default function DiscoverScreen() {
   const requestLocation = useCallback(async () => {
     setLocationStatus('loading');
     
-    // Web平台使用浏览器Geolocation API
+    // Web平台优先使用高德地图高精度定位，失败时回退到浏览器Geolocation
     if (Platform.OS === 'web') {
+      try {
+        const pos = await getCurrentPositionWithAMap();
+        setLocation({ latitude: pos.latitude, longitude: pos.longitude });
+        setLocationStatus('success');
+        return;
+      } catch (amapError) {
+        console.log('高德定位失败，回退到浏览器定位:', (amapError as Error).message);
+      }
+
       if (typeof navigator !== 'undefined' && navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
           (position) => {
