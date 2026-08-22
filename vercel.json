@@ -4,6 +4,7 @@
   "buildCommand": "cd client && npx expo export --platform web",
   "outputDirectory": "client/dist",
   "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "functions": {
