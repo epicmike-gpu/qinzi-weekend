@@ -51,6 +51,7 @@ export default function DiscoverScreen() {
   const [selectedDistance, setSelectedDistance] = useState(5);
   const [locationStatus, setLocationStatus] = useState<'loading' | 'success' | 'fallback' | 'error'>('loading');
   const [refreshing, setRefreshing] = useState(false);
+  const [locationDebug, setLocationDebug] = useState('');
 
   // 获取位置
   const requestLocation = useCallback(async () => {
@@ -64,7 +65,9 @@ export default function DiscoverScreen() {
         setLocationStatus('success');
         return;
       } catch (amapError) {
-        console.log('高德定位失败，回退到浏览器定位:', (amapError as Error).message);
+        const msg = (amapError as Error).message;
+        console.log('高德定位失败，回退到浏览器定位:', msg);
+        setLocationDebug(`高德:${msg}`);
       }
 
       if (typeof navigator !== 'undefined' && navigator.geolocation) {
@@ -329,6 +332,7 @@ export default function DiscoverScreen() {
               <Feather name="alert-circle" size={14} color="#FDCB6E" />
               <Text style={styles.locationTipText}>
                 定位权限未开启，显示的是默认位置。点击右侧按钮可重新定位。
+                {locationDebug ? `\n[调试] ${locationDebug}` : ''}
               </Text>
             </View>
           )}

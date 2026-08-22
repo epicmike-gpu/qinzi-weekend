@@ -71,7 +71,11 @@ export async function getCurrentPositionWithAMap(): Promise<AMapPosition> {
             address: result.formattedAddress,
           });
         } else {
-          reject(new Error(result?.message || '高德定位失败'));
+          // 带上高德返回的 info 码与 message，便于排查（如 INVALID_USER_DOMAIN=白名单问题）
+          const info = result?.info || '';
+          const msg = result?.message || '高德定位失败';
+          console.error('[AMap] 定位失败 status=', status, 'info=', info, 'message=', msg);
+          reject(new Error(`${msg}(${info})`));
         }
       });
     } catch (e) {
