@@ -57,10 +57,17 @@ export async function getCurrentPositionWithAMap(): Promise<AMapPosition> {
   return new Promise((resolve, reject) => {
     try {
       const geolocation = new AMap.Geolocation({
-        enableHighAccuracy: true, // 高精度模式
-        timeout: 10000, // 超时 10 秒
+        enableHighAccuracy: true, // 高精度模式（启用 GPS + WiFi + 基站混合定位）
+        timeout: 15000, // 超时 15 秒（给 WiFi 定位更多时间）
         zoomToAccuracy: true, // 定位成功后缩放至精度范围
         GeoLocationFirst: true, // 优先使用浏览器定位
+        useNative: true, // 使用原生定位（支持 WiFi 定位）
+        noIpLocate: 0, // 允许 IP 定位作为兜底（0=允许，1=禁止）
+        noGeoLocation: 0, // 允许浏览器 Geolocation（0=允许，1=禁止）
+        showButton: false, // 不显示高德默认定位按钮
+        showMarker: false, // 不显示定位 marker
+        panToLocation: false, // 不自动平移地图
+        extensions: 'all', // 返回完整信息（包括地址）
       });
       geolocation.getCurrentPosition((status: string, result: any) => {
         if (status === 'complete' && result.position) {
