@@ -49,6 +49,7 @@ export default function DiscoverScreen() {
   const [loading, setLoading] = useState(true);
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [selectedDistance, setSelectedDistance] = useState(5);
+  const [selectedCategory, setSelectedCategory] = useState('all');
   const [locationStatus, setLocationStatus] = useState<'loading' | 'success' | 'fallback' | 'error'>('loading');
   const [refreshing, setRefreshing] = useState(false);
   const [locationDebug, setLocationDebug] = useState('');
@@ -147,12 +148,45 @@ export default function DiscoverScreen() {
     }
   }, []);
 
-  // 获取附近场所
+  // 获取附近场所（优先高德POI搜索真实数据，失败时回退本地数据库）
   const fetchNearbyPlaces = useCallback(async () => {
     if (!location) return;
 
     try {
       setLoading(true);
+      // 高德POI分类编码映射：公园110101 动物园110102 游乐园110105 博物馆140100 科教文化140000
+      try {
+        const res = await placesApi.searchAmapNearby(
+          location.latitude,
+          location.longitude,
+          {
+            radius: selectedDistance * 1000,
+            category: selectedCategory,
+            keywords: selectedCategory === 'farm' ? '农场|农家乐|牧场' : undefined,
+            pageSize: 20,
+          }
+        );
+        if (res.success && res.data.length > 0) {
+          // 将高德POI数据转换为Place结构（images由string[]转为{url}[]）
+          const normalized: Place[] = res.data.map((p) => ({
+            id: p.id,
+            name: p.name,
+            category: p.category,
+            address: p.address,
+            latitude: p.latitude,
+            longitude: p.longitude,
+            images: p.images.map((url) => ({ url })),
+            description: p.type,
+            distance: p.distance,
+          }));
+          setPlaces(normalized as (Place & { distance: number })[]);
+          return;
+        }
+      } catch (amapErr) {
+        console.log('高德POI搜索失败，回退本地数据库:', (amapErr as Error).message);
+      }
+
+      // 回退：本地数据库搜索
       const res = await placesApi.getNearby(
         location.latitude,
         location.longitude,
@@ -167,7 +201,7 @@ export default function DiscoverScreen() {
     } finally {
       setLoading(false);
     }
-  }, [location, selectedDistance]);
+  }, [location, selectedDistance, selectedCategory]);
 
   useEffect(() => {
     requestLocation();
@@ -177,7 +211,43 @@ export default function DiscoverScreen() {
     if (location) {
       fetchNearbyPlaces();
     }
-  }, [location, fetchNearbyPlaces]);
+  }, [location, selectedDistance, selectedCategory, fetchNearbyPlaces]);
+
+  // 渲染分类筛选
+  const renderCategoryFilter = () => {
+    const categories = [
+      { key: 'all', label: '全部' },
+      { key: 'park', label: '公园' },
+      { key: 'zoo', label: '动物园' },
+      { key: 'theme_park', label: '游乐园' },
+      { key: 'museum', label: '博物馆' },
+      { key: 'science_center', label: '科技馆' },
+      { key: 'farm', label: '农场' },
+    ];
+    return (
+      <View style={styles.distanceFilter}>
+        {categories.map((cat) => (
+          <TouchableOpacity
+            key={cat.key}
+            style={[
+              styles.distanceChip,
+              selectedCategory === cat.key && styles.distanceChipActive,
+            ]}
+            onPress={() => setSelectedCategory(cat.key)}
+          >
+            <Text
+              style={[
+                styles.distanceChipText,
+                selectedCategory === cat.key && styles.distanceChipTextActive,
+              ]}
+            >
+              {cat.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    );
+  };
 
   // 渲染距离筛选
   const renderDistanceFilter = () => {
@@ -338,6 +408,7 @@ export default function DiscoverScreen() {
           )}
 
           {/* 距离筛选 */}
+          {renderCategoryFilter()}
           {renderDistanceFilter()}
 
           {/* 场所列表 */}

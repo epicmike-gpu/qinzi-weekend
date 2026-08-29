@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { getSupabaseClient } from '../storage/database/supabase-client.js';
+import { searchNearbyPOIs } from '../services/amap.js';
 
 const router = Router();
 const client = getSupabaseClient();
@@ -167,7 +168,41 @@ router.get('/recommend/smart', async (req, res) => {
   }
 });
 
-// 获取附近场所
+// 高德POI周边搜索（真实场所数据）—— 静态路由，必须定义在 /:id 之前
+router.get('/amap-nearby', async (req, res) => {
+  try {
+    const {
+      latitude,
+      longitude,
+      radius = 5000,
+      category = 'all',
+      keywords = '',
+      page = 1,
+      pageSize = 20,
+    } = req.query;
+
+    if (!latitude || !longitude) {
+      return res.status(400).json({ success: false, message: '请提供位置信息' });
+    }
+
+    const result = await searchNearbyPOIs({
+      latitude: Number(latitude),
+      longitude: Number(longitude),
+      radius: Number(radius),
+      category: String(category),
+      keywords: String(keywords),
+      page: Number(page),
+      pageSize: Number(pageSize),
+    });
+
+    res.json({ success: true, data: result.pois, total: result.total });
+  } catch (err) {
+    console.error('高德周边搜索失败:', err);
+    res.status(500).json({ success: false, message: err instanceof Error ? err.message : '搜索失败' });
+  }
+});
+
+// 获取附近场所（本地数据库）
 router.get('/nearby', async (req, res) => {
   try {
     const { latitude, longitude, distance = 5, limit = 20 } = req.query;
@@ -202,6 +237,33 @@ router.get('/nearby', async (req, res) => {
   } catch (err) {
     console.error('获取附近场所失败:', err);
     res.status(500).json({ success: false, message: '获取附近场所失败' });
+  }
+});
+
+// 高德周边搜索（真实POI数据：公园/博物馆/游乐园等）
+// GET /api/v1/places/amap-nearby?latitude=23.02&longitude=113.12&distance=5000&category=all&page=1&pageSize=20
+router.get('/amap-nearby', async (req, res) => {
+  try {
+    const { latitude, longitude, distance = 5000, category = 'all', page = 1, pageSize = 20, keywords } = req.query;
+
+    if (!latitude || !longitude) {
+      return res.status(400).json({ success: false, message: '请提供位置信息' });
+    }
+
+    const result = await searchNearbyPOIs({
+      latitude: Number(latitude),
+      longitude: Number(longitude),
+      radius: Number(distance),
+      category: String(category),
+      page: Number(page),
+      pageSize: Number(pageSize),
+      keywords: keywords ? String(keywords) : undefined,
+    });
+
+    res.json({ success: true, data: result.pois, total: result.total, source: 'amap' });
+  } catch (err: any) {
+    console.error('高德周边搜索失败:', err);
+    res.status(500).json({ success: false, message: err.message || '高德周边搜索失败' });
   }
 });
 

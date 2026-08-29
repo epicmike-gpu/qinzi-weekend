@@ -22,6 +22,20 @@ async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
   return response.json();
 }
 
+// 高德POI场所类型
+export interface AmapPlace {
+  id: string;
+  name: string;
+  type: string;
+  category: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  distance: number;
+  images: string[];
+  tel: string;
+}
+
 // 场所相关API
 export const placesApi = {
   /**
@@ -74,6 +88,29 @@ export const placesApi = {
       ...(limit && { limit: String(limit) }),
     });
     return request<{ success: boolean; data: (Place & { distance: number })[] }>(`/places/nearby?${params}`);
+  },
+
+  /**
+   * 服务端文件：server/src/routes/places.ts
+   * 接口：GET /api/v1/places/amap-nearby
+   * Query 参数：latitude: number, longitude: number, radius?: number(米), category?: string, keywords?: string, page?: number, pageSize?: number
+   * 返回高德POI真实场所数据（佛山等任意城市均可搜索）
+   */
+  searchAmapNearby: (
+    latitude: number,
+    longitude: number,
+    options?: { radius?: number; category?: string; keywords?: string; page?: number; pageSize?: number }
+  ) => {
+    const params = new URLSearchParams({
+      latitude: String(latitude),
+      longitude: String(longitude),
+    });
+    if (options?.radius) params.append('radius', String(options.radius));
+    if (options?.category) params.append('category', options.category);
+    if (options?.keywords) params.append('keywords', options.keywords);
+    if (options?.page) params.append('page', String(options.page));
+    if (options?.pageSize) params.append('pageSize', String(options.pageSize));
+    return request<{ success: boolean; data: AmapPlace[]; total: number }>(`/places/amap-nearby?${params}`);
   },
 
   /**
